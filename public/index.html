@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orchestration Patterns Lab</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --ink:#e6edf3; --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --bad:#f85149; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:24px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin-bottom:20px; }
+  .scenario { background:var(--card); border:1px solid #30363d; border-radius:10px; padding:14px 16px; margin-bottom:20px; }
+  .scenario b { color:var(--acc); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-bottom:24px; }
+  .pat { background:var(--card); border:1px solid #30363d; border-radius:10px; padding:12px 14px; cursor:pointer; transition:border-color .15s; }
+  .pat:hover { border-color:var(--acc); }
+  .pat.sel { border-color:var(--acc); box-shadow:0 0 0 1px var(--acc); }
+  .pat h3 { margin:0 0 4px; font-size:15px; }
+  .pat p { margin:0; color:var(--mut); font-size:13px; }
+  .trace { background:var(--card); border:1px solid #30363d; border-radius:10px; padding:16px; }
+  .ev { display:flex; gap:10px; padding:5px 0; border-bottom:1px solid #21262d; font-size:14px; animation:in .25s ease both; }
+  .ev:last-child { border-bottom:none; }
+  @keyframes in { from { opacity:0; transform:translateY(4px) } to { opacity:1 } }
+  .step { color:var(--mut); width:2em; text-align:right; flex:none; }
+  .actor { color:var(--acc); font-weight:600; width:150px; flex:none; font-family:ui-monospace,monospace; font-size:13px; }
+  .note { color:var(--mut); }
+  .stats { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid #30363d; font-size:14px; }
+  .stats b { color:var(--acc); }
+  .verdict { font-weight:700; }
+  .verdict.pass { color:var(--ok); } .verdict.fail { color:var(--bad); }
+  .vnote { color:var(--mut); flex-basis:100%; }
+  #runall { margin-top:8px; }
+  table.cmp { width:100%; border-collapse:collapse; font-size:13.5px; }
+  table.cmp th, table.cmp td { padding:6px 10px; border-bottom:1px solid #21262d; text-align:left; }
+  table.cmp th { color:var(--mut); font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Orchestration Patterns Lab</h1>
+  <p class="sub">One complaint, six coordination designs. Same task — different outcomes.</p>
+
+  <div class="scenario" id="scenario"></div>
+
+  <div class="grid" id="grid"></div>
+  <button id="runall" style="background:#21262d;color:var(--ink);border:1px solid #30363d;border-radius:8px;padding:8px 16px;cursor:pointer;margin-bottom:20px">Run all six → compare</button>
+  <div id="compare"></div>
+  <div class="trace" id="trace" hidden></div>
+</main>
+<script type="module">
+  const scenario = document.getElementById('scenario');
+  const grid = document.getElementById('grid');
+  const traceEl = document.getElementById('trace');
+  const compareEl = document.getElementById('compare');
+
+  const patterns = await (await fetch('/api/patterns')).json();
+  const first = await (await fetch('/api/run?pattern=naive')).json();
+  scenario.innerHTML = `<b>${first.scenario.title}</b> — ${first.scenario.detail}`;
+
+  let selected = null;
+  const cards = patterns.map(p => {
+    const d = document.createElement('div');
+    d.className = 'pat';
+    d.innerHTML = `<h3>${p.name}</h3><p>${p.blurb}</p>`;
+    d.onclick = () => { selected = p.id; cards.forEach(c => c.classList.toggle('sel', c === d)); run(p.id); };
+    grid.appendChild(d);
+    return d;
+  });
+
+  async function run(id) {
+    const r = await (await fetch('/api/run?pattern=' + id)).json();
+    compareEl.innerHTML = '';
+    traceEl.hidden = false;
+    traceEl.innerHTML = `<h3 style="margin:0 0 8px">${r.pattern.name}</h3>`;
+    for (const e of r.events) {
+      const row = document.createElement('div');
+      row.className = 'ev';
+      row.innerHTML = `<span class="step">${e.step}</span><span class="actor">${e.actor}</span><span>${e.action}${e.note ? ` <span class="note">— ${e.note}</span>` : ''}</span>`;
+      traceEl.appendChild(row);
+      await new Promise(res => setTimeout(res, 260));
+    }
+    const s = document.createElement('div');
+    s.className = 'stats';
+    s.innerHTML = `<span>agent calls: <b>${r.agentCalls}</b></span><span>ticks: <b>${r.ticks}</b></span><span>refunds issued: <b>${r.refunds}</b></span><span class="verdict ${r.verdict}">${r.verdict === 'pass' ? '✔ correct' : '✘ failure mode'}</span><span class="vnote">${r.verdictNote}</span>`;
+    traceEl.appendChild(s);
+  }
+
+  document.getElementById('runall').onclick = async () => {
+    const all = await (await fetch('/api/run-all')).json();
+    traceEl.hidden = true;
+    compareEl.innerHTML = `<table class="cmp"><tr><th>Pattern</th><th>agent calls</th><th>ticks</th><th>refunds</th><th>result</th></tr>` +
+      all.map(r => `<tr><td>${r.pattern.name}</td><td>${r.agentCalls}</td><td>${r.ticks}</td><td>${r.refunds}</td><td class="verdict ${r.verdict}">${r.verdict === 'pass' ? '✔' : '✘'}</td></tr>`).join('') + `</table>`;
+  };
+</script>
+</body>
+</html>

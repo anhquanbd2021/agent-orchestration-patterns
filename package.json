@@ -1,0 +1,15 @@
+{
+  "name": "agent-orchestration-patterns-demo",
+  "version": "1.0.0",
+  "description": "Companion demo: one refund complaint run through six orchestration patterns — watch the un-orchestrated run refund three times.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node app/server.js",
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
